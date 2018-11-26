@@ -184,7 +184,7 @@ until the server responds before it updates the local state with the response bo
     "operation": "A string representing the operation to construct the set. Will always be one of: 'join', 'intersect','difference', or 'filter'",
     "setName": "a string representing the user generated name for the set",
     // sets are the sets to be used in the generation of a new set. 
-    // If the operation is 'filter' the sets array will always be empty
+    // If the operation is 'filter' the sets array will always be null or empty
     // If the operation is a unary operation (negate or random) sets will have a length of 1
     // For all other operations the sets array will have a length of 2
     "sets": [ 
@@ -194,7 +194,18 @@ until the server responds before it updates the local state with the response bo
         "random": 1345 // an integer representing how many random elements of this set should be used
         // if random: 0 should be interpreted as 'false' and the entire set should be used
       }
-    ]   
+    ],
+    //If the operation is not 'filter', this field should be null or undefined
+    //If 'operation' is filter, this is a string representing a filter query constructed as follows: 
+    // a data field + an operation + some user entered value + AND/OR/NOT(iff an aditional filter criterion exists)
+    // the string includes a single space inbetween each element in the above formula.
+    "filter":'data_prop > user_value AND data_prop = user_value',
+    // This should be either 'user' or 'team'. If 'user', then we assume set belongs to user with specified 'userName'
+    "setBelongsTo": 'user',
+    //user name, mandatory
+    "userName": 'john',
+    "type":"a string value that confoms to one of the setTypes passed in /config",
+    "groupByFields":["array","of","fields","to","group","by"]
   }
 ```
 
@@ -379,7 +390,10 @@ passed has a type of "entities"
 - sort[]='data_prop.asc'&sort[1]='data_prop.desc' : 
   an array of data fields to sort by and the direction of the sort. The array is in order of the 
   priority of the sort (e.g. sort by factor 0 asc THEN by factor 1 desc)
-
+- fields='field1;field2;...' :
+  fields to return, separated by semi-colon. For instance, specifying 'notes;emails;toCount'
+  would exclude all fields other than these three.
+  If not provided, assume that ALL fields are returned. 
 - filter='data_prop > user_value AND data_prop = user_value" :
   a string representing a sort constructed as follows: 
     a data field + an operation + some user entered value + AND/OR/NOT(iff an aditional filter 
@@ -390,18 +404,24 @@ passed has a type of "entities"
 ```javascript
   [
     {
+      //EmbryoEntity documents that are linked to this Entity. 
+      //Given Entity e, each key/value pair in this object corresponds to one EmbryoEntity from 
+      // db.EmbryoEntity.find({_id:{$in:e.embryoEntitiesIds}})
       "embryos": {
         "some embryo id":{
-          // this follos the Embryo schema. The client application has a helper method to render 
+          // this follos the EmbryoEntity schema. The client application has a helper method to render 
           // the current list of elements in this object that are listed in the /config response
           // but will render any values that are in this object except for another object
         },
+        
+        //Given Entity e, this is derived by taking emailAddress.emailAddress for 
+        //  each emailAddress in e.emailAddresses. 
         "emails":[
           "an array of strings representing all the email addresses associated with the entity"
         ],
-        "middlenames":[
-          "an array of strings representing all the middle names associated with the entity"
-        ],
+        //EntityNote documents that are linked to this Entity.
+        //Given Entity e, each key/value pair in this object corresponds to one EntityNote from
+        // db.EntityNote.find({entityId:e._id})
         "notes":{
           "some note id":{
             "entityId":"an entity id for the entity the note belongs to",
@@ -410,27 +430,41 @@ passed has a type of "entities"
             "updatedAt":"2018-06-11T21:04:42.759Z"
           }
         },
+        //The following three fields come from collection EntityFlag. Given Entity e,
+        // and given en = db.EntityFlag.findOne({_id:e._id}),
+        // these come from en.flagged, en.banned, and en.read 
+        "flagged":false, // a Boolean represneting if the entity is flagged
+        "banned":false, // 
+        "read": false // a Boolean representing if the user has viewed this item
+        
+        //Ignore this, for now...
         "documents":{
           "some document id":{
             "embryo_id":"an embryo id for the embryo the document belongs to",
             "relationship":"FROM" // an Enum conforming to the documents schema 
           }
         },
-        "roleconfidence":null, // a 2 decimal place precision number or null 
-        "rolesource":null, // an Enum conforming to the entities schema
-        "rolestatus":null, // an Enum conforming to the entities schema
-        "roletype":null, // an Enum conforming to the entities schema
+        
+        //If e.entityRole is not null, take from e.entityRole.roleConfidence. Null otherwise.
+        "roleConfidence":null, 
+        //If e.entityRole is not null, take from e.entityRole.source. Null otherwise. 
+        "roleSource":null, 
+        // If e.entityRole is not null, take from e.entityRole.status. Null otherwise. 
+        "roleStatus":null, 
+        //If e.entityRole is not null, take from e.entityRole.entityRoleType. Null otherwise. 
+        "roleType":null, 
+        //If e.primaryName is not null, take from e.primaryName.name. Null otherwise. 
         "primaryName":"a string representing the most likely name for the entity",
+        //Take from e._id
         "id":"an id for the entity itself",
-        "toCount":0, // an int representing the number of documents with a relationship of "TO"
-        "fromCount":5, // an int representing the number of documents with a relationship of "FROM"
-        "ccCount":0, // an int representing the number of documents with a relationship of "CC"
+        //e.numEmailsSent
+        "numEmailsSent":0, 
+        //e.numEmailsFrom
+        "fromCount":5, 
+        //e.nameVariants
         "nameVariants":[
           "an array of strings representing all the possible other names the entity could have"
         ],
-        "flagged":false, // a Boolean represneting if the entity is flagged
-        "banned":false, // a Boolean represneting if the entity is banned
-        "read": false // a Boolean representing if the user has viewed this item
     }
   ]
 ```
