@@ -135,7 +135,7 @@ actual set data, only metadata about the set used to to help a user select a set
 On load the App component makes a requests to get the list of sets available to the user.
 
 ##### Expected Query String Supported
-none
+/sets?userName=some_user_name
 
 ##### Expected Response
 ```javascript
